@@ -75,7 +75,16 @@ npm run dev
 2. 環境変数を設定
 3. デプロイ
 
-Cron ジョブは `vercel.json` で設定済みです（5分間隔でリマインド送信）。
+### リマインド定期実行 (GitHub Actions)
+
+リマインド通知は GitHub Actions で5分間隔に実行されます（`.github/workflows/remind.yml`）。
+
+リポジトリの **Settings > Secrets and variables > Actions** で以下の Secrets を追加してください：
+
+| Secret 名 | 値 |
+|---|---|
+| `APP_URL` | デプロイ先URL（例: `https://your-app.vercel.app`） |
+| `CRON_SECRET` | Vercelの環境変数 `CRON_SECRET` と同じ値 |
 
 ## LINE連携の使い方
 
