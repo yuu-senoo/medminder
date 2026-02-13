@@ -7,6 +7,16 @@ export const metadata: Metadata = {
   title: "くすりログ - 服薬管理アプリ",
   description:
     "家族・少人数向けの服薬管理Webアプリ。LINEリマインドで飲み忘れを防止します。",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

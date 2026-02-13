@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#4A90A4"/>
+
+  <!-- Capsule pill - tilted -->
+  <g transform="translate(232, 218) rotate(-35)">
+    <rect x="-120" y="-46" width="240" height="92" rx="46" fill="white"/>
+    <line x1="0" y1="-46" x2="0" y2="46" stroke="#89C0D0" stroke-width="3"/>
+  </g>
+
+  <!-- Checkmark badge -->
+  <circle cx="364" cy="360" r="58" fill="#F5A623"/>
+  <polyline points="336,358 354,378 394,332" fill="none" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
