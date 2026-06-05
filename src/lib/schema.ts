@@ -54,6 +54,15 @@ export const familyMembers = sqliteTable("family_members", {
   createdAt: integer("created_at").notNull(),
 });
 
+export const lineLinkCodes = sqliteTable("line_link_codes", {
+  code: text("code").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  expiresAt: integer("expires_at").notNull(), // epoch ms
+  createdAt: integer("created_at").notNull(),
+});
+
 export const familyInvites = sqliteTable("family_invites", {
   id: text("id").primaryKey(),
   ownerUserId: text("owner_user_id")

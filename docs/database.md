@@ -110,6 +110,17 @@ pending → missed  (飲み忘れ ※将来的にCronで自動更新)
 | usedByUserId | used_by_user_id | TEXT | nullable | 使用者のユーザーID |
 | createdAt | created_at | INTEGER | NOT NULL | UNIXタイムスタンプ |
 
+### line_link_codes
+
+LINE連携用の6桁コードを保存。コード発行ルートとWebhookは別々のサーバーレスインスタンスで動くため、メモリではなくDBで共有する。
+
+| カラム | DB名 | 型 | 制約 | 説明 |
+|---|---|---|---|---|
+| code | code | TEXT | PK | 6桁の連携コード |
+| userId | user_id | TEXT | NOT NULL, FK→users.id | 連携対象のユーザーID |
+| expiresAt | expires_at | INTEGER | NOT NULL | 有効期限 (epoch ms, 10分) |
+| createdAt | created_at | INTEGER | NOT NULL | UNIXタイムスタンプ |
+
 ## Drizzle ORM の命名規約
 
 - **スキーマ (TypeScript)**: camelCase（例: `userId`, `scheduleTimes`）

@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
 import { verifySignature, replyMessage } from "@/lib/line";
 import { db, initializeDatabase } from "@/lib/db";
-import { users, medications, medicationLogs } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { users, medications, medicationLogs, lineLinkCodes } from "@/lib/schema";
+import { eq, and, lt } from "drizzle-orm";
 import { todayJST } from "@/lib/utils";
 
-// In-memory store for LINE link codes (code -> { userId, expiresAt })
-const linkCodes = new Map<string, { userId: string; expiresAt: number }>();
+const LINK_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-export function storeLinkCode(code: string, userId: string) {
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-  linkCodes.set(code, { userId, expiresAt });
-}
-
-export function getLinkCodes() {
-  return linkCodes;
+// Persist link codes in the DB so the code-generation route and this webhook
+// (which run as separate serverless instances) can share them.
+export async function storeLinkCode(code: string, userId: string) {
+  const now = Date.now();
+  // Replace any existing codes for this user with the new one.
+  await db.delete(lineLinkCodes).where(eq(lineLinkCodes.userId, userId));
+  await db.insert(lineLinkCodes).values({
+    code,
+    userId,
+    expiresAt: now + LINK_CODE_TTL_MS,
+    createdAt: now,
+  });
 }
 
 const TAKEN_KEYWORDS = ["飲んだ", "のんだ", "ok", "OK", "完了", "飲みました", "のみました"];
@@ -90,12 +94,15 @@ async function handleLinkCode(
 ) {
   // Clean expired codes
   const now = Date.now();
-  for (const [key, value] of linkCodes.entries()) {
-    if (value.expiresAt < now) linkCodes.delete(key);
-  }
+  await db.delete(lineLinkCodes).where(lt(lineLinkCodes.expiresAt, now));
 
-  const linkData = linkCodes.get(code);
-  if (!linkData) {
+  const linkData = await db
+    .select()
+    .from(lineLinkCodes)
+    .where(eq(lineLinkCodes.code, code))
+    .get();
+
+  if (!linkData || linkData.expiresAt < now) {
     await replyMessage(
       replyToken,
       "連携コードが無効または期限切れです。アプリから新しいコードを取得してください。"
@@ -108,7 +115,7 @@ async function handleLinkCode(
     .set({ lineUserId })
     .where(eq(users.id, linkData.userId));
 
-  linkCodes.delete(code);
+  await db.delete(lineLinkCodes).where(eq(lineLinkCodes.code, code));
 
   await replyMessage(
     replyToken,

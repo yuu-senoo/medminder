@@ -2,16 +2,19 @@ import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth-helpers";
 import { generateLinkCode } from "@/lib/utils";
 import { storeLinkCode } from "@/app/api/line/webhook/route";
+import { initializeDatabase } from "@/lib/db";
 
 export async function POST() {
   try {
+    await initializeDatabase();
+
     const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
     const code = generateLinkCode();
-    storeLinkCode(code, userId);
+    await storeLinkCode(code, userId);
 
     return NextResponse.json({ code });
   } catch (error) {

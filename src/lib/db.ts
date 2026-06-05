@@ -55,6 +55,13 @@ export async function initializeDatabase() {
       created_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS line_link_codes (
+      code TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS family_invites (
       id TEXT PRIMARY KEY,
       owner_user_id TEXT NOT NULL REFERENCES users(id),
