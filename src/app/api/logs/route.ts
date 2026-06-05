@@ -5,6 +5,7 @@ import { db, initializeDatabase } from "@/lib/db";
 import { medicationLogs } from "@/lib/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { getCurrentUserId } from "@/lib/auth-helpers";
+import { ensureLogsForRange } from "@/lib/schedule";
 
 const logSchema = z.object({
   medicationId: z.string(),
@@ -27,6 +28,13 @@ export async function GET(request: Request) {
     const startDate = url.searchParams.get("startDate");
     const endDate = url.searchParams.get("endDate");
     const medicationId = url.searchParams.get("medicationId");
+
+    // 期間指定がある場合は、未生成の服薬予定（pending ログ）を補完してから取得する。
+    // お薬登録時には予定が作られないため、ここで穴埋めしないと
+    // ダッシュボード・カレンダーに何も表示されない。
+    if (startDate && endDate) {
+      await ensureLogsForRange(targetUserId, startDate, endDate);
+    }
 
     const conditions = [eq(medicationLogs.userId, targetUserId)];
 
