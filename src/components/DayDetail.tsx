@@ -6,7 +6,7 @@ interface MedicationLog {
   scheduledAt: string;
   status: string;
   takenAt: string | null;
-  source: string;
+  source: string | null;
 }
 
 interface Medication {

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { verifySignature, replyMessage } from "@/lib/line";
 import { db, initializeDatabase } from "@/lib/db";
 import { users, medications, medicationLogs } from "@/lib/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 import { todayJST } from "@/lib/utils";
+import { computeOccurrences, recordDose } from "@/lib/occurrences";
 
 // In-memory store for LINE link codes (code -> { userId, expiresAt })
 const linkCodes = new Map<string, { userId: string; expiresAt: number }>();
@@ -134,48 +135,62 @@ async function handleTakenMessage(
 
   // Check if a specific medication name is mentioned
   const specificMed = userMeds.find((med) => text.includes(med.name));
+  const targetMeds = specificMed ? [specificMed] : userMeds;
 
-  // Get pending logs for today
-  const pendingLogs = await db
+  // 今日の服薬予定をスケジュールから算出する（予定は行を持たない）。
+  const slots = computeOccurrences(targetMeds, [today]);
+  if (slots.length === 0) {
+    await replyMessage(
+      replyToken,
+      specificMed
+        ? "該当する服薬予定が見つかりませんでした。"
+        : "今日の服薬予定はありません。"
+    );
+    return;
+  }
+
+  // すでに taken/skipped 記録済みの枠を除外する。
+  const stored = await db
     .select()
     .from(medicationLogs)
     .where(
       and(
         eq(medicationLogs.userId, userId),
-        eq(medicationLogs.status, "pending")
+        gte(medicationLogs.scheduledAt, startOfDay),
+        lte(medicationLogs.scheduledAt, endOfDay)
       )
     )
     .all();
-
-  const todayPendingLogs = pendingLogs.filter(
-    (log) => log.scheduledAt >= startOfDay && log.scheduledAt <= endOfDay
+  const doneKeys = new Set(
+    stored
+      .filter((l) => l.status === "taken" || l.status === "skipped")
+      .map((l) => `${l.medicationId}|${l.scheduledAt}`)
   );
 
-  if (todayPendingLogs.length === 0) {
+  const slotsToRecord = slots.filter(
+    (s) => !doneKeys.has(`${s.medicationId}|${s.scheduledAt}`)
+  );
+
+  if (slotsToRecord.length === 0) {
     await replyMessage(replyToken, "今日の服薬予定はすべて記録済みです。");
     return;
   }
 
-  const logsToUpdate = specificMed
-    ? todayPendingLogs.filter((log) => log.medicationId === specificMed.id)
-    : todayPendingLogs;
-
-  if (logsToUpdate.length === 0) {
-    await replyMessage(replyToken, "該当する服薬予定が見つかりませんでした。");
-    return;
-  }
-
   const now = new Date().toISOString();
-  for (const log of logsToUpdate) {
-    await db
-      .update(medicationLogs)
-      .set({ status: "taken", takenAt: now, source: "line" })
-      .where(eq(medicationLogs.id, log.id));
+  for (const slot of slotsToRecord) {
+    await recordDose({
+      userId,
+      medicationId: slot.medicationId,
+      scheduledAt: slot.scheduledAt,
+      status: "taken",
+      takenAt: now,
+      source: "line",
+    });
   }
 
   const medNames: string[] = [];
-  for (const log of logsToUpdate) {
-    const med = userMeds.find((m) => m.id === log.medicationId);
+  for (const slot of slotsToRecord) {
+    const med = userMeds.find((m) => m.id === slot.medicationId);
     if (med && !medNames.includes(med.name)) medNames.push(med.name);
   }
 

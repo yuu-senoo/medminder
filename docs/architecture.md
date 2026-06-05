@@ -37,8 +37,7 @@
 | `api/auth/register/route.ts` | API | ユーザー登録 |
 | `api/medications/route.ts` | API | 薬一覧取得 (GET) / 新規登録 (POST) |
 | `api/medications/[id]/route.ts` | API | 薬更新 (PUT) / 削除 (DELETE) |
-| `api/logs/route.ts` | API | ログ取得 (GET) / 作成 (POST) |
-| `api/logs/[id]/route.ts` | API | ログ更新 (PUT) |
+| `api/logs/route.ts` | API | 服薬予定＋実績の取得 (GET) / 服薬記録の upsert (POST) |
 | `api/line/webhook/route.ts` | API | LINE Webhook受信・服薬記録 |
 | `api/line/link/route.ts` | API | LINE連携コード発行 |
 | `api/cron/remind/route.ts` | API | リマインド送信（定期実行） |
@@ -68,6 +67,29 @@
 | `auth-helpers.ts` | `getSession()`, `getCurrentUserId()` |
 | `line.ts` | LINE SDK クライアント・署名検証・メッセージ送受信 |
 | `utils.ts` | 日付処理（JST変換）、スケジュール判定、コード生成 |
+| `occurrences.ts` | 服薬予定の算出（仮想オカレンス）・ビュー生成・服薬記録の upsert |
+
+## 服薬予定の算出（仮想オカレンス）
+
+服薬予定は `medication_logs` に行として保存せず、`medications` のスケジュール定義
+（`scheduleType` / `scheduleTimes` / `scheduleDays` / `scheduleInterval` / 期間）から
+**取得時に算出**する。`medication_logs` には実際に記録されたイベント（taken/skipped）
+だけが入る。
+
+```
+GET /api/logs?startDate=&endDate=
+  └─ buildLogView() (occurrences.ts)
+       1. computeOccurrences(): 薬のスケジュールから期間内の予定枠を算出
+       2. medication_logs から保存済みイベント（taken/skipped）を取得
+       3. 枠に記録があれば実績を、無ければ導出（過去=missed / 当日・未来=pending）
+       4. 予定外の過去の記録も履歴として残す
+
+POST /api/logs（服薬記録・スキップ）
+  └─ recordDose(): (userId, medicationId, scheduledAt) を自然キーに upsert
+```
+
+この設計により、薬の登録・スケジュール編集が即座に予定へ反映され、予定生成用の
+バッチ処理が不要になる（cron はリマインド送信のみを担当）。
 
 ## レイアウト階層
 
@@ -113,7 +135,7 @@ GitHub Actions (5分間隔)
       ├─ lineUserId が設定済みの全ユーザーを取得
       ├─ 各ユーザーのアクティブな薬を取得
       ├─ 現在時刻と scheduleTimes を照合（5分ウィンドウ）
-      ├─ 該当する薬の pending ログを作成（重複チェック済み）
+      ├─ その枠に taken/skipped 記録が無ければ通知対象とする（DB書き込みなし）
       └─ LINE Push Message で通知
 ```
 
