@@ -63,7 +63,9 @@ export async function GET(request: Request) {
           const currMinutes = currH * 60 + currM;
 
           if (currMinutes >= schedMinutes && currMinutes < schedMinutes + 5) {
-            // Check if log already exists for this schedule
+            // Check if log already exists for this schedule.
+            // 服薬予定は表示時にも事前生成されるため、ログの有無ではなく
+            // pending かどうかで通知判定する（未服薬の枠だけリマインドする）。
             const scheduledAt = `${today}T${time}:00`;
             const existingLog = await db
               .select()
@@ -88,6 +90,9 @@ export async function GET(request: Request) {
                 createdAt: Math.floor(Date.now() / 1000),
               });
 
+              medsToRemind.push(med);
+            } else if (existingLog.status === "pending") {
+              // すでに予定だけ生成済みで未服薬 → 通知する
               medsToRemind.push(med);
             }
           }
