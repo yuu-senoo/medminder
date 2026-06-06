@@ -1,0 +1,15 @@
+name = "medminder-remind-cron"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+# 5分ごとに発火（GitHub Actions の */5 と同じ間隔）
+[triggers]
+crons = ["*/5 * * * *"]
+
+# アプリのベースURL。デプロイ前に実際のURLへ書き換える。
+# 末尾スラッシュは Worker 側で除去するためどちらでも可。
+[vars]
+APP_URL = "https://your-app.example.com"
+
+# CRON_SECRET は平文で置かず、シークレットとして登録する:
+#   cd cron-worker && npx wrangler secret put CRON_SECRET
