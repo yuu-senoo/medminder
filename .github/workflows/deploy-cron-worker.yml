@@ -1,0 +1,35 @@
+name: Deploy Cron Worker
+
+# 服薬リマインド用 Cloudflare Worker (cron-worker/) をデプロイする。
+# main への push で cron-worker/ 配下が変わったとき、または手動実行で動く。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cron-worker/**"
+      - ".github/workflows/deploy-cron-worker.yml"
+  workflow_dispatch: # 手動実行も可能
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cron-worker
+          # CRON_SECRET も同時に Worker のシークレットとして登録する
+          secrets: |
+            CRON_SECRET
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

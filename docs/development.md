@@ -183,10 +183,14 @@ Next.js 16 のルートパラメータは `Promise` 型。`const { id } = await 
 2. 環境変数を Vercel Dashboard で設定
 3. 自動デプロイ
 
-### GitHub Actions (リマインド)
+### リマインド (Cloudflare Workers Cron)
 
-`.github/workflows/remind.yml` で5分間隔でリマインドAPIを呼び出し。
+`cron-worker/` の Cloudflare Worker が **5分間隔** で `GET /api/cron/remind` を叩く。
+GitHub Actions の `schedule`（遅延が大きく時刻精度に難あり）から移行したもの。
 
-リポジトリの **Settings > Secrets > Actions** に設定:
-- `APP_URL`: デプロイ先URL（例: `https://your-app.vercel.app`）
-- `CRON_SECRET`: Vercelの `CRON_SECRET` と同じ値
+セットアップ・デプロイ手順は [`cron-worker/README.md`](../cron-worker/README.md) を参照。
+
+要点:
+- `cron-worker/wrangler.toml` の `APP_URL` をデプロイ先URLに設定
+- `npx wrangler secret put CRON_SECRET` でアプリと同じ値を登録
+- `npm run deploy` でデプロイ（無料プランで動作。5分間隔=288回/日）
