@@ -66,13 +66,18 @@ export default function Calendar({
     return "partial";
   };
 
-  // Calculate monthly rate
+  // Calculate monthly rate.
+  // 服薬率は「実績が確定した枠（服薬済み or 飲み忘れ）」を母数にする。
+  // 未来の pending やスキップは母数に含めない。
   const monthLogs = logs.filter((l) => {
     const d = l.scheduledAt.slice(0, 7);
     return d === format(currentMonth, "yyyy-MM");
   });
-  const monthTotal = monthLogs.length;
-  const monthTaken = monthLogs.filter((l) => l.status === "taken").length;
+  const dueLogs = monthLogs.filter(
+    (l) => l.status === "taken" || l.status === "missed"
+  );
+  const monthTotal = dueLogs.length;
+  const monthTaken = dueLogs.filter((l) => l.status === "taken").length;
   const monthRate = monthTotal > 0 ? Math.round((monthTaken / monthTotal) * 100) : 0;
 
   const weekDays = ["日", "月", "火", "水", "木", "金", "土"];

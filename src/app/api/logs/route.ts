@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import { db, initializeDatabase } from "@/lib/db";
-import { medicationLogs } from "@/lib/schema";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { medications, medicationLogs } from "@/lib/schema";
+import { eq, and } from "drizzle-orm";
 import { getCurrentUserId } from "@/lib/auth-helpers";
-import { ensureLogsForRange } from "@/lib/schedule";
+import { buildLogView, recordDose } from "@/lib/occurrences";
 
 const logSchema = z.object({
   medicationId: z.string(),
@@ -29,21 +28,19 @@ export async function GET(request: Request) {
     const endDate = url.searchParams.get("endDate");
     const medicationId = url.searchParams.get("medicationId");
 
-    // 期間指定がある場合は、未生成の服薬予定（pending ログ）を補完してから取得する。
-    // お薬登録時には予定が作られないため、ここで穴埋めしないと
-    // ダッシュボード・カレンダーに何も表示されない。
+    // 期間指定がある場合は、薬のスケジュールから服薬予定を算出し、
+    // 保存済みの服薬イベント（taken/skipped）を重ね合わせて返す。
+    // 予定は行として持たず、ここで計算するのが本設計の要。
     if (startDate && endDate) {
-      await ensureLogsForRange(targetUserId, startDate, endDate);
+      let view = await buildLogView(targetUserId, startDate, endDate);
+      if (medicationId) {
+        view = view.filter((v) => v.medicationId === medicationId);
+      }
+      return NextResponse.json(view);
     }
 
+    // 期間指定が無い場合は保存済みイベントのみを返す（予定の計算は行わない）。
     const conditions = [eq(medicationLogs.userId, targetUserId)];
-
-    if (startDate) {
-      conditions.push(gte(medicationLogs.scheduledAt, startDate));
-    }
-    if (endDate) {
-      conditions.push(lte(medicationLogs.scheduledAt, endDate + "T23:59:59"));
-    }
     if (medicationId) {
       conditions.push(eq(medicationLogs.medicationId, medicationId));
     }
@@ -83,26 +80,33 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
-    const id = uuidv4();
 
-    await db.insert(medicationLogs).values({
-      id,
-      medicationId: data.medicationId,
+    // 対象の薬がログイン中ユーザーのものか確認する。
+    const med = await db
+      .select()
+      .from(medications)
+      .where(
+        and(eq(medications.id, data.medicationId), eq(medications.userId, userId))
+      )
+      .get();
+    if (!med) {
+      return NextResponse.json(
+        { error: "薬が見つかりません" },
+        { status: 404 }
+      );
+    }
+
+    // 自然キー（userId + medicationId + scheduledAt）で upsert する。
+    const saved = await recordDose({
       userId,
+      medicationId: data.medicationId,
       scheduledAt: data.scheduledAt,
-      takenAt: data.takenAt ?? null,
       status: data.status,
+      takenAt: data.takenAt ?? null,
       source: data.source,
-      createdAt: Math.floor(Date.now() / 1000),
     });
 
-    const created = await db
-      .select()
-      .from(medicationLogs)
-      .where(eq(medicationLogs.id, id))
-      .get();
-
-    return NextResponse.json(created, { status: 201 });
+    return NextResponse.json(saved, { status: 201 });
   } catch (error) {
     console.error("Log create error:", error);
     return NextResponse.json(

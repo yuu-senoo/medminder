@@ -69,6 +69,11 @@ users
 
 ### medication_logs
 
+**実際に記録された服薬イベント（taken / skipped）だけ**を保存するテーブル。
+服薬予定（pending）や飲み忘れ（missed）は行として持たず、取得時に
+`medications` のスケジュール定義から算出する（[architecture.md](architecture.md)
+の「服薬予定の算出（仮想オカレンス）」を参照）。
+
 | カラム | DB名 | 型 | 制約 | 説明 |
 |---|---|---|---|---|
 | id | id | TEXT | PK | UUID |
@@ -76,17 +81,20 @@ users
 | userId | user_id | TEXT | NOT NULL, FK→users.id | 対象ユーザー |
 | scheduledAt | scheduled_at | TEXT | NOT NULL | 予定日時 (ISO 8601) |
 | takenAt | taken_at | TEXT | nullable | 服薬日時 (ISO 8601) |
-| status | status | TEXT | NOT NULL | `"pending"` / `"taken"` / `"skipped"` / `"missed"` |
+| status | status | TEXT | NOT NULL | 通常は `"taken"` / `"skipped"`（記録済みイベント） |
 | source | source | TEXT | NOT NULL | `"web"` / `"line"` |
 | createdAt | created_at | INTEGER | NOT NULL | UNIXタイムスタンプ |
 
-**status の状態遷移:**
+**自然キー:** `(user_id, medication_id, scheduled_at)` の組で 1 枠を一意に識別する。
+服薬記録は `POST /api/logs` でこのキーを使って upsert される。
 
-```
-pending → taken   (服薬記録)
-pending → skipped (スキップ)
-pending → missed  (飲み忘れ ※将来的にCronで自動更新)
-```
+**status について:**
+
+- `"taken"` … 服薬を記録した枠
+- `"skipped"` … スキップした枠
+- `"pending"` / `"missed"` … 行としては保存せず、取得時に算出（過去で未記録なら
+  `missed`、当日・未来で未記録なら `pending`）。
+  旧実装が作成した `"pending"` 行が残っていても、取得時は「未記録」として無視される。
 
 ### family_members
 

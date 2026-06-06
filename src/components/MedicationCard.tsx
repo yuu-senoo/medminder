@@ -20,8 +20,8 @@ interface Medication {
 interface MedicationCardProps {
   medication: Medication;
   logs: MedicationLog[];
-  onTaken: (logId: string) => void;
-  onSkip: (logId: string) => void;
+  onTaken: (medicationId: string, scheduledAt: string) => void;
+  onSkip: (medicationId: string, scheduledAt: string) => void;
 }
 
 export default function MedicationCard({
@@ -74,13 +74,13 @@ export default function MedicationCard({
               {log.status === "pending" && (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => onTaken(log.id)}
+                    onClick={() => onTaken(log.medicationId, log.scheduledAt)}
                     className="px-3 py-1 text-sm bg-success/20 text-success hover:bg-success/30 rounded-lg font-medium transition-colors"
                   >
                     飲んだ
                   </button>
                   <button
-                    onClick={() => onSkip(log.id)}
+                    onClick={() => onSkip(log.medicationId, log.scheduledAt)}
                     className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
                   >
                     スキップ

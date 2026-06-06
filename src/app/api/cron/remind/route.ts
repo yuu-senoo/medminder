@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { v4 as uuidv4 } from "uuid";
 import { db, initializeDatabase } from "@/lib/db";
 import { users, medications, medicationLogs } from "@/lib/schema";
 import { eq, and, isNotNull } from "drizzle-orm";
@@ -63,11 +62,11 @@ export async function GET(request: Request) {
           const currMinutes = currH * 60 + currM;
 
           if (currMinutes >= schedMinutes && currMinutes < schedMinutes + 5) {
-            // Check if log already exists for this schedule.
-            // 服薬予定は表示時にも事前生成されるため、ログの有無ではなく
-            // pending かどうかで通知判定する（未服薬の枠だけリマインドする）。
+            // 服薬予定は行を持たず計算で導出するため、cron はデータを作らず
+            // 通知の送信のみを担う。taken/skipped が記録済みの枠はスキップし、
+            // 未記録の枠だけリマインドする。
             const scheduledAt = `${today}T${time}:00`;
-            const existingLog = await db
+            const event = await db
               .select()
               .from(medicationLogs)
               .where(
@@ -78,21 +77,7 @@ export async function GET(request: Request) {
               )
               .get();
 
-            if (!existingLog) {
-              // Create pending log
-              await db.insert(medicationLogs).values({
-                id: uuidv4(),
-                medicationId: med.id,
-                userId: user.id,
-                scheduledAt,
-                status: "pending",
-                source: "line",
-                createdAt: Math.floor(Date.now() / 1000),
-              });
-
-              medsToRemind.push(med);
-            } else if (existingLog.status === "pending") {
-              // すでに予定だけ生成済みで未服薬 → 通知する
+            if (!event || (event.status !== "taken" && event.status !== "skipped")) {
               medsToRemind.push(med);
             }
           }

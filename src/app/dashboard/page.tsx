@@ -57,12 +57,16 @@ export default function DashboardPage() {
     }
   }, [status, router, fetchData]);
 
-  const handleTaken = async (logId: string) => {
+  // 服薬予定は行を持たないため、medicationId + scheduledAt を自然キーとして
+  // upsert する（POST /api/logs）。
+  const handleTaken = async (medicationId: string, scheduledAt: string) => {
     try {
-      await fetch(`/api/logs/${logId}`, {
-        method: "PUT",
+      await fetch("/api/logs", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          medicationId,
+          scheduledAt,
           status: "taken",
           takenAt: new Date().toISOString(),
           source: "web",
@@ -74,12 +78,17 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSkip = async (logId: string) => {
+  const handleSkip = async (medicationId: string, scheduledAt: string) => {
     try {
-      await fetch(`/api/logs/${logId}`, {
-        method: "PUT",
+      await fetch("/api/logs", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "skipped", source: "web" }),
+        body: JSON.stringify({
+          medicationId,
+          scheduledAt,
+          status: "skipped",
+          source: "web",
+        }),
       });
       fetchData();
     } catch (error) {
