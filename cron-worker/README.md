@@ -56,6 +56,27 @@ npm run deploy
 デプロイ後、Cloudflare ダッシュボードの Workers & Pages > 該当Worker > Settings > Triggers で
 Cron `*/5 * * * *` が登録されていることを確認できる。
 
+## 自動デプロイ (GitHub Actions)
+
+`.github/workflows/deploy-cron-worker.yml` により、`main` への push で
+`cron-worker/` 配下が変わると自動デプロイされる（手動実行も可）。
+CIが `CRON_SECRET` も Worker シークレットとして登録するため、CI運用なら上記の
+`wrangler secret put` は不要。
+
+リポジトリの **Settings > Secrets and variables > Actions** に以下を登録する:
+
+| シークレット | 内容 |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare の API トークン（"Edit Cloudflare Workers" 権限） |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare のアカウントID |
+| `CRON_SECRET` | アプリ側の `CRON_SECRET` と同じ値 |
+
+API トークンは Cloudflare ダッシュボード > My Profile > API Tokens >
+「Edit Cloudflare Workers」テンプレートで発行できる。
+アカウントIDは Workers & Pages のページ右側で確認できる。
+
+> 初回だけは `APP_URL`（`wrangler.toml`）を本番URLに設定したうえで main にマージすること。
+
 ## 動作確認・ログ
 
 ```bash
